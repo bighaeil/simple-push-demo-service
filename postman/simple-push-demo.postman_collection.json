@@ -1,0 +1,218 @@
+{
+  "info": {
+    "name": "Simple Push Demo Service",
+    "description": "README 검증 시나리오 1~8을 Postman으로 옮긴 컬렉션. 변수 `baseUrl`은 컬렉션 변수로 정의되어 있으며 기본값은 http://localhost:8080.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/actuator/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["actuator", "health"]
+        },
+        "description": "앱이 살아있는지 확인. `{\"status\":\"UP\"...}` 응답이면 OK."
+      }
+    },
+    {
+      "name": "1. HIGH 결제 알림 1건",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/notifications",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "notifications"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": 1000,\n  \"type\": \"PAYMENT_COMPLETED\",\n  \"priority\": \"HIGH\",\n  \"data\": { \"orderId\": \"A-1\" },\n  \"idempotencyKey\": \"scn1-{{$guid}}\"\n}"
+        },
+        "description": "API → Orchestrator → push.high → HIGH 풀 → ✓ 도달. 202 Accepted 예상."
+      }
+    },
+    {
+      "name": "2a. 멱등성 - 첫 호출",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/notifications",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "notifications"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": 1000,\n  \"type\": \"PAYMENT_COMPLETED\",\n  \"priority\": \"HIGH\",\n  \"data\": { \"orderId\": \"A-2\" },\n  \"idempotencyKey\": \"postman-fixed-key\"\n}"
+        },
+        "description": "고정 idempotencyKey로 첫 호출 — 202 + `accepted`."
+      }
+    },
+    {
+      "name": "2b. 멱등성 - 재호출 (같은 키)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/notifications",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "notifications"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": 1000,\n  \"type\": \"PAYMENT_COMPLETED\",\n  \"priority\": \"HIGH\",\n  \"data\": { \"orderId\": \"A-2\" },\n  \"idempotencyKey\": \"postman-fixed-key\"\n}"
+        },
+        "description": "2a와 같은 키로 재호출 — 200 OK + `duplicate`. 큐에는 발행 안 됨."
+      }
+    },
+    {
+      "name": "3. push OFF (1002) + NORMAL → SKIP",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/notifications",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "notifications"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": 1002,\n  \"type\": \"FRIEND_REQUEST\",\n  \"priority\": \"NORMAL\",\n  \"data\": { \"fromName\": \"홍길동\" },\n  \"idempotencyKey\": \"scn3-{{$guid}}\"\n}"
+        },
+        "description": "1002는 pushEnabled=false. Orchestrator 로그에 `푸시 OFF → SKIP`."
+      }
+    },
+    {
+      "name": "4. push OFF (1002) + CRITICAL → 발송",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/notifications",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "notifications"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": 1002,\n  \"type\": \"PAYMENT_COMPLETED\",\n  \"priority\": \"CRITICAL\",\n  \"data\": { \"orderId\": \"CR-1\" },\n  \"idempotencyKey\": \"scn4-{{$guid}}\"\n}"
+        },
+        "description": "CRITICAL은 DND/push OFF 무시 → `[HIGH 풀] ✓ 도달 userId=1002`."
+      }
+    },
+    {
+      "name": "5. invalid token (1003) → 비활성화",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/notifications",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "notifications"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": 1003,\n  \"type\": \"FRIEND_REQUEST\",\n  \"priority\": \"NORMAL\",\n  \"data\": { \"fromName\": \"테스터\" },\n  \"idempotencyKey\": \"scn5-{{$guid}}\"\n}"
+        },
+        "description": "1003 토큰은 `invalid-`로 시작 → BadDeviceToken → 비활성화."
+      }
+    },
+    {
+      "name": "6. 5번 직후 1003 재발송 → 활성 디바이스 없음",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/notifications",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "notifications"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": 1003,\n  \"type\": \"FRIEND_REQUEST\",\n  \"priority\": \"NORMAL\",\n  \"data\": { \"fromName\": \"테스터2\" },\n  \"idempotencyKey\": \"scn6-{{$guid}}\"\n}"
+        },
+        "description": "5번 직후 실행. Orchestrator 로그 `활성 디바이스 없음 → SKIP`."
+      }
+    },
+    {
+      "name": "7. 10건 일괄 (Runner 권장)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/notifications",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "notifications"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": 1000,\n  \"type\": \"PAYMENT_COMPLETED\",\n  \"priority\": \"HIGH\",\n  \"data\": { \"orderId\": \"B-{{$timestamp}}\" },\n  \"idempotencyKey\": \"scn7-{{$guid}}\"\n}"
+        },
+        "description": "Postman Runner로 이 요청만 10회 실행 → 일부 `⟳ 재시도` 자연 발생."
+      }
+    },
+    {
+      "name": "8a. 격리 시연 - BULK 30건",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/notifications/bulk?count=30&priority=LOW&userId=1000",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "notifications", "bulk"],
+          "query": [
+            { "key": "count", "value": "30" },
+            { "key": "priority", "value": "LOW" },
+            { "key": "userId", "value": "1000" }
+          ]
+        },
+        "description": "BULK 풀(워커 1개)이 ~5초 동안 처리. 즉시 8b를 실행해 격리 효과 확인."
+      }
+    },
+    {
+      "name": "8b. 격리 시연 - HIGH 1건",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/notifications",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "notifications"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": 1000,\n  \"type\": \"PAYMENT_COMPLETED\",\n  \"priority\": \"HIGH\",\n  \"data\": { \"orderId\": \"PRIORITY-1\" },\n  \"idempotencyKey\": \"scn8-{{$guid}}\"\n}"
+        },
+        "description": "8a 직후 호출. 로그에서 HIGH가 BULK 처리 중간에 ✓ 도달하는지 확인."
+      }
+    }
+  ]
+}
