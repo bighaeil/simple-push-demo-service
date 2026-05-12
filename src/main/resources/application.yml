@@ -1,0 +1,51 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: simple-push-demo-service
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      auto-offset-reset: earliest
+      properties:
+        spring.json.trusted.packages: "com.example.pushdemo.*"
+    producer:
+      acks: all
+      properties:
+        spring.json.add.type.headers: true
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+push-demo:
+  topics:
+    notification-requested: notification.requested
+    push-critical: push.critical
+    push-high: push.high
+    push-normal: push.normal
+    push-bulk: push.bulk
+  idempotency:
+    ttl-hours: 24
+  mock-apns:
+    success-rate: 0.75
+    retryable-rate: 0.20
+    # invalid-rate = 1 - success - retryable
+
+logging:
+  level:
+    com.example.pushdemo: INFO
+    org.apache.kafka: WARN
+    org.springframework.kafka: INFO
