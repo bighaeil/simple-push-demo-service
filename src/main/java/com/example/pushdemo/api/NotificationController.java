@@ -10,6 +10,12 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * 외부 진입점. 단일 알림 발송과 벌크 발송(Phase 5 격리 시연용)을 노출한다.
+ *
+ * <p>- {@code POST /api/notifications} — 단건. 첫 호출이면 202 Accepted, 멱등 차단이면 200 OK.<br>
+ * - {@code POST /api/notifications/bulk?count=N&priority=LOW} — N건을 같은 사용자에게 일괄 발송.
+ */
 @RestController
 @RequestMapping("/api/notifications")
 public class NotificationController {

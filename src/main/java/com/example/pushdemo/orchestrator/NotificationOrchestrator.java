@@ -14,6 +14,22 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * {@code notification.requested} 컨슘 → 발송 자격 검사 → 우선순위 토픽으로 분기.
+ *
+ * <p>검사 순서 (위에서 아래로, 하나라도 걸리면 SKIP):
+ * <ol>
+ *   <li>알 수 없는 userId</li>
+ *   <li>(CRITICAL 아니라면) {@code pushEnabled=false}</li>
+ *   <li>(CRITICAL 아니라면) DND 시간대</li>
+ *   <li>활성 디바이스 0개</li>
+ * </ol>
+ *
+ * <p>CRITICAL은 결제 같은 "꼭 도달해야 하는" 알림이라 사용자 설정을 우회한다(단, 디바이스가 없으면 보낼 곳이 없어 SKIP).
+ *
+ * <p>분기 후에는 {@link com.example.pushdemo.common.PushMessage}로 변환해 우선순위별 토픽으로 발행 —
+ * Worker가 그 토픽에서 픽업한다.
+ */
 @Component
 public class NotificationOrchestrator {
 
