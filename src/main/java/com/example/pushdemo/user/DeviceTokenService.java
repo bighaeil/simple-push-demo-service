@@ -8,6 +8,15 @@ import org.springframework.stereotype.Service;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * 사용자별 디바이스 토큰 보관.
+ *
+ * <p>APNs가 INVALID_TOKEN(BadDeviceToken/Unregistered)을 돌려주면 Worker가
+ * {@link #deactivate(Long, String)}을 호출해 제거한다. 제거 후 같은 사용자에게 재발송 시
+ * Orchestrator에서 "활성 디바이스 없음 → SKIP" 으로 끝난다(시나리오 6).
+ *
+ * <p>실서비스라면 DB. 여기서는 ConcurrentHashMap 인메모리.
+ */
 @Service
 public class DeviceTokenService {
 

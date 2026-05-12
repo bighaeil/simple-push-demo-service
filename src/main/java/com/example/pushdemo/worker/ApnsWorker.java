@@ -15,6 +15,26 @@ import org.springframework.kafka.retrytopic.TopicSuffixingStrategy;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.stereotype.Component;
 
+/**
+ * 우선순위 풀별 컨슈머 + APNs 호출 + 재시도/DLQ 처리.
+ *
+ * <p>풀 구성:
+ * <ul>
+ *   <li>HIGH 풀 — {@code push.critical} + {@code push.high}, concurrency=3, group {@code apns-high-pool}</li>
+ *   <li>NORMAL 풀 — {@code push.normal}, concurrency=2, group {@code apns-normal-pool}</li>
+ *   <li>BULK 풀 — {@code push.bulk}, concurrency=1, group {@code apns-bulk-pool}</li>
+ * </ul>
+ *
+ * <p>BULK 풀이 워커 1개인 건 의도된 디자인이다 — 대량 마케팅이 결제 알림을 막지 않도록 처리 자원을 격리.
+ * 풀별로 컨슈머 그룹이 분리되어 있으니 한 풀의 lag이 다른 풀로 전파되지 않는다.
+ *
+ * <p>{@code @RetryableTopic}이 각 리스너 메서드에 대해 retry-0..3과 .dlt 토픽을 자동 생성한다.
+ * RETRYABLE_FAILURE는 {@link RetryableApnsException}으로 던져서 retry로 흘려보내고, INVALID_TOKEN은
+ * 그 자리에서 토큰을 비활성화하고 정상 종료해 retry에 들어가지 않게 분리한다.
+ *
+ * <p>5회까지 retry 후에도 실패하면 {@code @DltHandler}가 {@code [DLQ] 최종 실패}를 찍는다 —
+ * 실서비스라면 여기서 운영자 슬랙/이메일 + 분석 저장.
+ */
 @Component
 public class ApnsWorker {
 

@@ -5,6 +5,12 @@ import org.springframework.stereotype.Component;
 
 import java.util.Map;
 
+/**
+ * 알림 타입 + 언어 → (title, body) 렌더링.
+ *
+ * <p>실서비스라면 i18n 메시지 번들 또는 Mustache/Thymeleaf 같은 템플릿 엔진을 쓰는 게 보통.
+ * 여기서는 학습용으로 switch + 문자열 결합. 의도적으로 단순.
+ */
 @Component
 public class TemplateRenderer {
 

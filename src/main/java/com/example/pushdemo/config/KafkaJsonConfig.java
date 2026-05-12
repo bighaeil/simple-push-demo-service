@@ -17,6 +17,14 @@ import org.springframework.kafka.support.serializer.JsonSerializer;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * JSON 직렬화 기반 KafkaTemplate / ListenerContainerFactory 설정.
+ *
+ * <p>producer 쪽 {@code JsonSerializer.setAddTypeInfo(true)}로 메시지 헤더에 클래스 정보를 부착하고,
+ * consumer 쪽 {@code JsonDeserializer.addTrustedPackages("com.example.pushdemo.*")}로
+ * 그 헤더를 받아 해당 클래스로 deserialize 한다. 신뢰 패키지를 좁혀두는 이유는
+ * 임의 클래스 역직렬화로 인한 RCE 위험을 차단하기 위함.
+ */
 @Configuration
 @EnableKafka
 public class KafkaJsonConfig {
